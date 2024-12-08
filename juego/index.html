@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Juego de Laberinto</title>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background-color: #f4f4f4;
+            font-family: Arial, sans-serif;
+        }
+        canvas {
+            border: 2px solid #000;
+            display: none; /* Inicialmente ocultamos el laberinto */
+        }
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(3, 50px);
+            gap: 5px;
+            margin-top: 10px;
+        }
+        .control-btn {
+            width: 50px;
+            height: 50px;
+            background-color: #007bff;
+            color: white;
+            font-size: 1.5rem;
+            border: none;
+            border-radius: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+        }
+        .control-btn:active {
+            background-color: #0056b3;
+        }
+        .empty {
+            visibility: hidden;
+        }
+        #message {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 3rem;
+            color: red;
+            text-align: center;
+            display: none;
+        }
+        .heart {
+            position: absolute;
+            font-size: 2rem;
+            color: red;
+            animation: fall 5s linear infinite;
+        }
+        @keyframes fall {
+            0% {
+                transform: translateY(-100%);
+            }
+            100% {
+                transform: translateY(100vh);
+            }
+        }
+        #timer {
+            font-size: 1.5rem;
+            margin-top: 20px;
+            font-weight: bold;
+        }
+        #start-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background-color: #ffffff;
+        }
+        #start-screen h1 {
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+        }
+        #start-btn {
+            padding: 10px 20px;
+            font-size: 1.5rem;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+        #start-btn:active {
+            background-color: #0056b3;
+        }
+        @media (max-width: 400px) {
+            .controls {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 10px;
+            }
+            canvas {
+                width: 80vw;
+                height: 80vw;
+            }
+            .control-btn {
+                width: 35px;
+                height: 35px;
+                font-size: 1.2rem;
+            }
+            #timer {
+                font-size: 1.2rem;
+            }
+            #message {
+                font-size: 2.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="start-screen">
+        <h1>Bienvenido al Juego de Laberinto</h1>
+        <button id="start-btn">Empezar</button>
+    </div>
+    
+    <div id="timer">Tiempo: 30</div>
+    <canvas id="laberinto" width="320" height="320"></canvas>
+    <div id="message">¡Felicidades princesa, te amo mucho! ❤️</div>
+
+    <div class="controls">
+        <button class="control-btn empty"></button>
+        <button class="control-btn" onclick="movePlayer(0, -1)">⬆️</button>
+        <button class="control-btn empty"></button>
+        <button class="control-btn" onclick="movePlayer(-1, 0)">⬅️</button>
+        <button class="control-btn empty"></button>
+        <button class="control-btn" onclick="movePlayer(1, 0)">➡️</button>
+        <button class="control-btn empty"></button>
+        <button class="control-btn" onclick="movePlayer(0, 1)">⬇️</button>
+        <button class="control-btn empty"></button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('laberinto');
+        const ctx = canvas.getContext('2d');
+        const message = document.getElementById('message');
+        const timerDisplay = document.getElementById('timer');
+        const startScreen = document.getElementById('start-screen');
+        const startBtn = document.getElementById('start-btn');
+        const body = document.body;
+
+        const maze = [
+            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+            [1, 1, 0, 1, 0, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1],
+            [1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1],
+            [1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1],
+            [1, 0, 1, 0, 0, 1, 0, 1, 1, 1, 1, 0, 1, 0, 0, 1, 0, 0, 0, 1],
+            [1, 0, 1, 0, 0, 1, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 0, 1, 1, 1],
+            [1, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1, 1, 1, 0, 0, 0, 1],
+            [1, 0, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 1, 1, 1, 1, 1],
+            [1, 0, 1, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 1, 1, 0, 0, 0, 1],
+            [1, 0, 0, 0, 0, 0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 1, 1, 1, 0, 1],
+            [1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 0, 0, 1],
+            [1, 0, 1, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 1, 0, 1, 0, 1, 0, 1],
+            [1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 0, 0, 0, 0, 1, 0, 1, 1, 1],
+            [1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 1, 1, 1, 0, 0, 0, 1],
+            [1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 0, 0, 0, 0, 1, 0, 1],
+            [1, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 1, 0, 1, 1, 1],
+            [1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 0, 0, 0, 1, 1],
+            [1, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 1],
+            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1]
+        ];
+
+        const cellSize = 16;
+        const player = { x: 1, y: 1 };
+        const goal = { x: 18, y: 19 };
+        const playerEmoji = "😍";
+        const goalEmoji = "💚";
+
+        let timer = 30;
+        let timerInterval;
+
+        function drawMaze() {
+            for (let row = 0; row < maze.length; row++) {
+                for (let col = 0; col < maze[row].length; col++) {
+                    ctx.fillStyle = maze[row][col] === 1 ? '#000' : '#fff';
+                    ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
+                }
+            }
+        }
+
+        function drawEntity(x, y, emoji) {
+            ctx.font = `${cellSize - 2}px Arial`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(
+                emoji,
+                x * cellSize + cellSize / 2,
+                y * cellSize + cellSize / 2
+            );
+        }
+
+        function drawGoal() {
+            ctx.fillStyle = "green";
+            ctx.fillRect(goal.x * cellSize, goal.y * cellSize, cellSize, cellSize);
+            drawEntity(goal.x, goal.y, goalEmoji);
+        }
+
+        function movePlayer(dx, dy) {
+            const newX = player.x + dx;
+            const newY = player.y + dy;
+
+            if (newX >= 0 && newY >= 0 && newX < maze[0].length && newY < maze.length && maze[newY][newX] === 0) {
+                player.x = newX;
+                player.y = newY;
+            }
+
+            checkGoal();
+            updateCanvas();
+        }
+
+        function checkGoal() {
+            if (player.x === goal.x && player.y === goal.y) {
+                message.style.display = 'block';
+                generateHearts();
+                setTimeout(() => {
+                    resetGame();
+                    message.style.display = 'none';
+                }, 10000); // 10 segundos
+            }
+        }
+
+        function generateHearts() {
+            for (let i = 0; i < 50; i++) {
+                const heart = document.createElement('div');
+                heart.classList.add('heart');
+                heart.innerText = '❤️';
+                heart.style.left = `${Math.random() * window.innerWidth}px`;
+                heart.style.animationDuration = `${Math.random() * 2 + 3}s`;
+                body.appendChild(heart);
+            }
+        }
+
+        function resetGame() {
+            player.x = 1;
+            player.y = 1;
+            timer = 30;
+            updateCanvas();
+            startTimer();
+        }
+
+        function updateCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawMaze();
+            drawGoal();
+            drawEntity(player.x, player.y, playerEmoji);
+        }
+
+        function startTimer() {
+            timerInterval = setInterval(() => {
+                timer--;
+                timerDisplay.innerText = `Tiempo: ${timer}`;
+                if (timer === 0) {
+                    clearInterval(timerInterval);
+                    resetGame();
+                }
+            }, 1000);
+        }
+
+        startBtn.addEventListener('click', () => {
+            startScreen.style.display = 'none'; // Ocultar pantalla de inicio
+            canvas.style.display = 'block'; // Mostrar el laberinto
+            startTimer();
+            updateCanvas();
+        });
+
+        window.onload = () => {
+            // Inicializamos el juego con la pantalla de inicio visible
+            canvas.style.display = 'none'; // Ocultamos el laberinto hasta que empiece
+        };
+    </script>
+</body>
+</html>
